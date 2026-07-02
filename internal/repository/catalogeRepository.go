@@ -25,12 +25,12 @@ type CatalogueRepository interface {
 	EditProduct(c *domain.Product) (*domain.Product, error)
 	DeleteProduct(id int) error
 }
-type catalogueRepository struct {
+type catalogueRepository struct {          // actual implementation and contains db connection
 	db *gorm.DB
 }
 
-func NewCatalogueRepository(db *gorm.DB) CatalogueRepository {
-	return &catalogueRepository{
+func NewCatalogueRepository(db *gorm.DB) CatalogueRepository {      // constructor creates new instance returns as interface type to keep code loosely coupled
+	return &catalogueRepository{    
 		db: db,
 	}
 }
