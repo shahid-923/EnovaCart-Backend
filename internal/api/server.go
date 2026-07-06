@@ -10,6 +10,7 @@ import (
 	"ecommerce-app/internal/helper"
 
 	"github.com/gofiber/fiber/v3"
+	"github.com/gofiber/fiber/v3/middleware/cors"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 )
@@ -33,6 +34,16 @@ func StartServer(config config.AppConfig) {
 		log.Fatalf("Database migration error: %v\n", err)
 	}
     log.Println("migration was successfull")
+
+    //cors configuration
+
+    c := cors.New(cors.Config{
+    AllowOrigins: []string{"http://localhost:3030"},
+    AllowHeaders: []string{"Content-Type", "Accept", "Authorization"},    // prevents sql injections
+    AllowMethods: []string{"GET", "POST", "PUT", "PATCH", "OPTIONS", "DELETE"},
+    })
+	
+    app.Use(c)
 
 	auth := helper.SetupAuth(config.AppSecret)
 
