@@ -33,11 +33,12 @@ func SetupCatalogueRoutes(rh *rest.RestHandler) {
 	app.Get("/products", handler.GetProducts)
 	app.Get("/products/:id", handler.GetProduct)
 
+	app.Get("/categories", handler.GetCategories)
+
 	// Seller Routes
 	sellRoutes := app.Group("/seller", rh.Auth.AuthorizeSeller())
 
 	// Categories
-	sellRoutes.Get("/categories", handler.GetCategories)
 	sellRoutes.Get("/categories/:id", handler.GetCategoryById)
 	sellRoutes.Post("/categories", handler.CreateCategories)
 	sellRoutes.Patch("/categories/:id", handler.EditCategory)
