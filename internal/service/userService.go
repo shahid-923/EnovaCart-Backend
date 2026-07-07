@@ -106,7 +106,7 @@ func (s *UserService) GetVerificationCode(e domain.User) error {
 		"This code is valid for the next 30 minutes.\n\n"+
 		"If you did not request this verification, you can safely ignore this email.\n\n"+
 		"Regards,\n"+
-		"MYCOM Team",
+		"NovaCart Team",
 	code,
     )
 
