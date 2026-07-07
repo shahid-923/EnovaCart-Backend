@@ -2,7 +2,7 @@ package domain
 
 import "time"
 
-const(
+const (
 	SELLER = "seller"
 	BUYER  = "buyer"
 )
