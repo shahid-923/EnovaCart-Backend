@@ -101,7 +101,7 @@ func (s *UserService) GetVerificationCode(e domain.User) error {
 
 	message := fmt.Sprintf(
 	"Hello,\n\n"+
-		"Thank you for registering with MYCOM.\n\n"+
+		"Thank you for registering with NovaCart.\n\n"+
 		"Your email verification code is: %d\n\n"+
 		"This code is valid for the next 30 minutes.\n\n"+
 		"If you did not request this verification, you can safely ignore this email.\n\n"+
