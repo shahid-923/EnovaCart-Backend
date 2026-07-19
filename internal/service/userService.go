@@ -5,6 +5,7 @@ import (
 	"ecommerce-app/internal/dto"
 	"ecommerce-app/internal/helper"
 	"ecommerce-app/internal/repository"
+	"log"
 
 	"ecommerce-app/config"
 	"ecommerce-app/pkg/notification"
@@ -17,6 +18,7 @@ type UserService struct {
 	Repo   repository.UserRepository
 	Auth   helper.Auth
 	Config config.AppConfig
+	CRepo  repository.CatalogueRepository
 }
 
 func (s *UserService) Register(input dto.UserSignup) (domain.User, string, error) {
@@ -100,15 +102,15 @@ func (s *UserService) GetVerificationCode(e domain.User) error {
 	notificationClient := notification.NewNotificationClient(s.Config)
 
 	message := fmt.Sprintf(
-	"Hello,\n\n"+
-		"Thank you for registering with MYCOM.\n\n"+
-		"Your email verification code is: %d\n\n"+
-		"This code is valid for the next 30 minutes.\n\n"+
-		"If you did not request this verification, you can safely ignore this email.\n\n"+
-		"Regards,\n"+
-		"MYCOM Team",
-	code,
-    )
+		"Hello,\n\n"+
+			"Thank you for registering with NovaCart.\n\n"+
+			"Your email verification code is: %d\n\n"+
+			"This code is valid for the next 30 minutes.\n\n"+
+			"If you did not request this verification, you can safely ignore this email.\n\n"+
+			"Regards,\n"+
+			"NovaCart Team",
+		code,
+	)
 
 	err = notificationClient.SendEmail(
 		user.Email,
@@ -202,10 +204,57 @@ func (s *UserService) FindCart(id uint) ([]interface{}, error) {
 	return nil, nil
 }
 
-func (s *UserService) CreateCart(input any, u domain.User) ([]interface{}, error) {
-	return nil, nil
-}
+func (s *UserService) CreateCart(input dto.CreateCartRequest, u domain.User) ([]domain.Cart, error) {
 
+	if input.ProductId == 0 {
+		return nil, errors.New("please provide the valid product id")
+	}
+
+	// check if cart item already exists for this user+product
+	cart, err := s.Repo.FindCartItem(u.ID, input.ProductId)
+	if err != nil {
+		return nil, errors.New("error checking cart item")
+	}
+
+	switch {
+	case cart.ID > 0 && input.Qty < 1:
+		// existing item, qty < 1 -> remove it
+		if err := s.Repo.DeleteCartById(cart.ID); err != nil {
+			log.Printf("Error deleting cart item %v", err)
+			return nil, errors.New("error on deleting cart item")
+		}
+
+	case cart.ID > 0 && input.Qty >= 1:
+		// existing item, qty given -> update it
+		cart.Qty = input.Qty
+		if err := s.Repo.UpdateCart(cart); err != nil {
+			return nil, errors.New("error on updating cart item")
+		}
+
+	case cart.ID == 0 && input.Qty >= 1:
+		// no existing item -> create new one
+		product, err := s.CRepo.FindProductById(int(input.ProductId))
+		if err != nil {
+			return nil, errors.New("product not found to create cart item")
+		}
+
+		newCart := domain.Cart{
+			ProductId: input.ProductId,
+			UserId:    u.ID,
+			Name:      product.Name,
+			ImageUrl:  product.ImageUrl,
+			Qty:       input.Qty,
+			Price:     int64(product.Price),
+			SellerId:  uint(product.UserId),
+		}
+
+		if err := s.Repo.CreateCart(newCart); err != nil {
+			return nil, errors.New("error on creating cart item")
+		}
+	}
+
+	return s.Repo.FindCartItems(u.ID)       // return the new total cart to save api calls
+}
 func (s *UserService) CreateOrder(u domain.User) (int, error) {
 	return 0, nil
 }
