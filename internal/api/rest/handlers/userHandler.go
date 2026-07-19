@@ -7,7 +7,7 @@ import (
 	"ecommerce-app/internal/dto"
 	"ecommerce-app/internal/repository"
 	"ecommerce-app/internal/service"
-    
+
 	"github.com/gofiber/fiber/v3"
 )
 
@@ -19,8 +19,8 @@ func SetupUserRoutes(rh *rest.RestHandler) {
 	app := rh.App
 
 	svc := &service.UserService{
-		Repo: repository.NewUserRepository(rh.DB),
-		Auth: rh.Auth,
+		Repo:   repository.NewUserRepository(rh.DB),
+		Auth:   rh.Auth,
 		Config: rh.Config,
 	}
 
@@ -34,8 +34,8 @@ func SetupUserRoutes(rh *rest.RestHandler) {
 
 	pvtRoutes := pubRoutes.Group("/", rh.Auth.Authorize())
 
-	pvtRoutes.Get("/verify", userHandler.GetVerificationCode)  // generates code
-    pvtRoutes.Post("/verify", userHandler.Verify)              // verifies code
+	pvtRoutes.Get("/verify", userHandler.GetVerificationCode) // generates code
+	pvtRoutes.Post("/verify", userHandler.Verify)             // verifies code
 	pvtRoutes.Post("/profile", userHandler.CreateProfile)
 	pvtRoutes.Get("/profile", userHandler.GetProfile)
 
@@ -134,11 +134,11 @@ func (h *UserHandler) Verify(ctx fiber.Ctx) error {
 	}
 
 	err = h.svc.VerifyCode(user.ID, req.Code)
-    if err != nil {
-    return ctx.Status(http.StatusBadRequest).JSON(fiber.Map{
-        "message": err.Error(),
-    })
-}
+	if err != nil {
+		return ctx.Status(http.StatusBadRequest).JSON(fiber.Map{
+			"message": err.Error(),
+		})
+	}
 
 	return ctx.Status(http.StatusOK).JSON(fiber.Map{
 		"message": "code verified",
@@ -166,9 +166,30 @@ func (h *UserHandler) GetVerificationCode(ctx fiber.Ctx) error {
 }
 
 func (h *UserHandler) AddToCart(ctx fiber.Ctx) error {
-	return ctx.Status(http.StatusOK).JSON(fiber.Map{
-		"message": "Item added to cart",
-	})
+
+	req := dto.CreateCartRequest{}
+	err := ctx.Bind().JSON(&req)
+	if err != nil {
+		return ctx.Status(http.StatusBadRequest).JSON(&fiber.Map{
+			"message": "please provide a valid product and quantity",
+		})
+	}
+
+	user, err := h.svc.Auth.GetCurrentUser(ctx)
+	if err != nil {
+		return ctx.Status(http.StatusUnauthorized).JSON(fiber.Map{
+			"message": "unauthorized",
+		})
+	}
+
+	// cal userService and perform creat cart operation
+	cartItems, err := h.svc.CreateCart(req, user)
+
+	if err != nil {
+		return rest.InternalError(ctx, err)
+	}
+
+	return rest.SuccessResponse(ctx, "cart created succesfully", cartItems)
 }
 
 func (h *UserHandler) GetCart(ctx fiber.Ctx) error {
@@ -205,10 +226,10 @@ func (h *UserHandler) BecomeSeller(ctx fiber.Ctx) error {
 	err = ctx.Bind().JSON(&req)
 	if err != nil {
 		return ctx.Status(http.StatusBadRequest).JSON(fiber.Map{
-			"message": "request parameters are not valid",	
+			"message": "request parameters are not valid",
 		})
 	}
-    token, err := h.svc.BecomeSeller(user.ID, req)
+	token, err := h.svc.BecomeSeller(user.ID, req)
 
 	if err != nil {
 		return ctx.Status(http.StatusBadRequest).JSON(fiber.Map{
