@@ -19,43 +19,43 @@ func StartServer(config config.AppConfig) {
 	log.Printf("Starting server")
 
 	app := fiber.New()
-	db, err := gorm.Open(postgres.Open(config.Dsn), &gorm.Config{})  //db is the gateway for doing database operations
-
+	db, err := gorm.Open(postgres.Open(config.Dsn), &gorm.Config{}) //db is the gateway for doing database operations
 
 	if err != nil {
-		log.Fatalf("Database connection error: %v\n", err )
+		log.Fatalf("Database connection error: %v\n", err)
 	}
-    
+
 	log.Println("Database connected successfully")
-	
+
 	//run migration
 	err = db.AutoMigrate(&domain.User{},
-		 &domain.BankAccount{},
-		 &domain.Category{},
-		 &domain.Product{},
-		 &domain.Cart{},
+		&domain.Address{},
+		&domain.BankAccount{},
+		&domain.Category{},
+		&domain.Product{},
+		&domain.Cart{},
 	)
 	if err != nil {
 		log.Fatalf("Database migration error: %v\n", err)
 	}
-    log.Println("migration was successfull")
+	log.Println("migration was successfull")
 
-    //cors configuration
+	//cors configuration
 
-    c := cors.New(cors.Config{
-    AllowOrigins: []string{"http://localhost:3030"},
-    AllowHeaders: []string{"Content-Type", "Accept", "Authorization"},    // prevents sql injections
-    AllowMethods: []string{"GET", "POST", "PUT", "PATCH", "OPTIONS", "DELETE"},
-    })
-	
-    app.Use(c)
+	c := cors.New(cors.Config{
+		AllowOrigins: []string{"http://localhost:3030"},
+		AllowHeaders: []string{"Content-Type", "Accept", "Authorization"}, // prevents sql injections
+		AllowMethods: []string{"GET", "POST", "PUT", "PATCH", "OPTIONS", "DELETE"},
+	})
+
+	app.Use(c)
 
 	auth := helper.SetupAuth(config.AppSecret)
 
 	rh := &rest.RestHandler{
-		App: app,
-		DB: db,
-		Auth: auth,
+		App:    app,
+		DB:     db,
+		Auth:   auth,
 		Config: config,
 	}
 
@@ -63,13 +63,12 @@ func StartServer(config config.AppConfig) {
 
 	log.Println("Listening on port", config.ServerPort)
 
-    if err := app.Listen(":" + config.ServerPort); err != nil {
-	log.Fatalf("Server failed to start: %v", err)
-   }
+	if err := app.Listen(":" + config.ServerPort); err != nil {
+		log.Fatalf("Server failed to start: %v", err)
+	}
 }
 
-
 func setupRoutes(rh *rest.RestHandler) {
-	handlers.SetupUserRoutes(rh)          // for userRoutes
-	handlers.SetupCatalogueRoutes(rh)     // for catalogueRoutes
+	handlers.SetupUserRoutes(rh)      // for userRoutes
+	handlers.SetupCatalogueRoutes(rh) // for catalogueRoutes
 }
