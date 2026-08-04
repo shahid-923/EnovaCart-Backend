@@ -34,6 +34,8 @@ func StartServer(config config.AppConfig) {
 		&domain.Category{},
 		&domain.Product{},
 		&domain.Cart{},
+		&domain.Order{},
+		&domain.OrderItem{},
 	)
 	if err != nil {
 		log.Fatalf("Database migration error: %v\n", err)
