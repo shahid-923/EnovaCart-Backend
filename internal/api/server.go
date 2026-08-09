@@ -71,6 +71,8 @@ func StartServer(config config.AppConfig) {
 }
 
 func setupRoutes(rh *rest.RestHandler) {
-	handlers.SetupUserRoutes(rh)      // for userRoutes
-	handlers.SetupCatalogueRoutes(rh) // for catalogueRoutes
+	handlers.SetupUserRoutes(rh)        // for userRoutes
+	handlers.SetupTransactionRoutes(rh) // for transactionRoutes
+	handlers.SetupCatalogueRoutes(rh)   // for catalogueRoutes
+
 }
