@@ -24,6 +24,11 @@ type UserRepository interface {
 	DeleteCartById(id uint) error
 	DeleteCartItems(uId uint) error
 
+	// Order
+	CreateOrder(o domain.Order) error
+	FindOrders(uId uint) ([]domain.Order, error)
+	FindOrderById(id uint, uId uint) (domain.Order, error)
+
 	// Profile
 	CreateProfile(e domain.Address) error
 	UpdateProfile(e domain.Address) error
@@ -68,7 +73,7 @@ func (r *userRepository) FindUser(email string) (domain.User, error) {
 func (r *userRepository) FindUserByID(id uint) (domain.User, error) {
 	var user domain.User
 
-	err := r.db.Preload("Address").First(&user, "id = ?", id).Error
+	err := r.db.Preload("Address").Preload("Cart").Preload("Orders").First(&user, "id = ?", id).Error // preload val same as fields in user.go
 	if err != nil {
 		return domain.User{}, err
 	}
@@ -93,10 +98,16 @@ func (r *userRepository) UpdateUser(id uint, u domain.User) (domain.User, error)
 }
 
 func (r *userRepository) FindCartItems(uId uint) ([]domain.Cart, error) {
-
 	var carts []domain.Cart
-	err := r.db.Where("user_id = ?", uId).Find(&carts).Error
-	return carts, err
+
+	err := r.db.
+		Where("user_id = ?", uId).Find(&carts).Error
+
+	if err != nil {
+		return nil, err
+	}
+
+	return carts, nil
 }
 
 func (r *userRepository) FindCartItem(uId uint, pId uint) (domain.Cart, error) {
@@ -126,7 +137,6 @@ func (r *userRepository) DeleteCartById(id uint) error {
 
 	err := r.db.Delete(&domain.Cart{}, id).Error
 	return err
-
 }
 
 func (r *userRepository) DeleteCartItems(uId uint) error {
@@ -152,4 +162,39 @@ func (r *userRepository) UpdateProfile(e domain.Address) error {
 		return errors.New("failed to update profile")
 	}
 	return nil
+}
+
+func (r *userRepository) CreateOrder(o domain.Order) error {
+
+	err := r.db.Create(&o).Error
+
+	if err != nil {
+		log.Printf("error on creating order %v", err)
+		return errors.New("failed to create order in database")
+	}
+	return nil
+}
+
+func (r *userRepository) FindOrders(uId uint) ([]domain.Order, error) {
+
+	var orders []domain.Order
+	err := r.db.Where("user_id", uId).Find(&orders).Error
+
+	if err != nil {
+		log.Printf("error on fetching orders %v", err)
+		return nil, errors.New("failed to fetch orders")
+	}
+	return orders, nil
+}
+
+func (r *userRepository) FindOrderById(id uint, uId uint) (domain.Order, error) {
+
+	var order domain.Order
+	err := r.db.Preload("Items").First(&order, id).Error
+
+	if err != nil {
+		log.Printf("error on fetching orders %v", err)
+		return domain.Order{}, errors.New("failed to fetch orders")
+	}
+	return order, nil
 }
