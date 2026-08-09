@@ -14,7 +14,10 @@ type User struct {
 	Email     string    `json:"email"      gorm:"index;unique;not null"`
 	Password  string    `json:"-"`
 	Phone     string    `json:"phone"`
-	Address   Address   `json:"address"`
+	Address   Address   `json:"address"` // relation
+	Cart      Cart      `json:"cart"`    // relation
+	Orders    Order     `json:"order"`   // relation
+	Payments  []Payment `json:"payment"` // relation
 	Code      int       `json:"code"`
 	Expiry    time.Time `json:"expiry"`
 	Verified  bool      `json:"verified"   gorm:"default:false"`
