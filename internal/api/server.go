@@ -34,6 +34,8 @@ func StartServer(config config.AppConfig) {
 		&domain.Category{},
 		&domain.Product{},
 		&domain.Cart{},
+		&domain.Order{},
+		&domain.OrderItem{},
 	)
 	if err != nil {
 		log.Fatalf("Database migration error: %v\n", err)
@@ -69,6 +71,8 @@ func StartServer(config config.AppConfig) {
 }
 
 func setupRoutes(rh *rest.RestHandler) {
-	handlers.SetupUserRoutes(rh)      // for userRoutes
-	handlers.SetupCatalogueRoutes(rh) // for catalogueRoutes
+	handlers.SetupUserRoutes(rh)        // for userRoutes
+	handlers.SetupTransactionRoutes(rh) // for transactionRoutes
+	handlers.SetupCatalogueRoutes(rh)   // for catalogueRoutes
+
 }

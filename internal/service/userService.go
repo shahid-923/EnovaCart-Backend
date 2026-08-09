@@ -321,20 +321,89 @@ func (s *UserService) CreateCart(input dto.CreateCartRequest, u domain.User) ([]
 
 func (s *UserService) FindCart(id uint) ([]domain.Cart, error) {
 
-	cartItems, err := s.Repo.FindCartItems(id)
-	log.Printf("error %v", err)
-
-	return cartItems, err
+	return s.Repo.FindCartItems(id)
 }
 
 func (s *UserService) CreateOrder(u domain.User) (int, error) {
-	return 0, nil
+
+	// find the cart items for the user
+	cartItems, err := s.Repo.FindCartItems(u.ID)
+
+	if err != nil {
+		return 0, errors.New("error on finding cart items")
+	}
+
+	if len(cartItems) == 0 {
+		return 0, errors.New("cart is empty cannot create the order")
+	}
+
+	// find success payment reference status
+	paymentId := ""     // get from payment providers
+	transactionId := "" // expose to the user
+
+	orderRef, _ := helper.RandomNumbers(8)
+
+	// create order with generated OrderNo
+	var amount float64
+	var orderItems []domain.OrderItem
+
+	for _, item := range cartItems {
+
+		amount += float64(item.Price) * float64(item.Qty)
+		orderItems = append(orderItems, domain.OrderItem{
+
+			ProductId: item.ProductId,
+			Qty:       item.Qty,
+			Price:     float64(item.Price),
+			Name:      item.Name,
+			ImageUrl:  item.ImageUrl,
+			SellerId:  item.SellerId,
+		})
+
+	}
+
+	order := domain.Order{
+		UserId:         u.ID,
+		PaymentId:      paymentId,
+		TransactionId:  transactionId,
+		OrderRefNumber: uint(orderRef),
+		Amount:         amount,
+		Items:          orderItems,
+	}
+
+	err = s.Repo.CreateOrder(order)
+
+	if err != nil {
+		return 0, err
+	}
+
+	// send email to the user with order details
+	// send email to the seller with order details
+
+	// remove the cart items after processing above
+	err = s.Repo.DeleteCartItems(u.ID)
+	log.Printf("Error deleting cart items %v")
+
+	// return orderRef no
+
+	return orderRef, nil
 }
 
-func (s *UserService) GetOrders(u domain.User) ([]interface{}, error) {
-	return nil, nil
+func (s *UserService) GetOrders(u domain.User) ([]domain.Order, error) {
+
+	orders, err := s.Repo.FindOrders(u.ID)
+	if err != nil {
+		return nil, errors.New("error fetching orders")
+	}
+	return orders, nil
 }
 
-func (s *UserService) GetOrderById(id uint, uId uint) ([]interface{}, error) {
-	return nil, nil
+func (s *UserService) GetOrderById(id uint, uId uint) (domain.Order, error) {
+
+	order, err := s.Repo.FindOrderById(id, uId)
+	if err != nil {
+		return domain.Order{}, err
+	}
+
+	return order, nil
 }
