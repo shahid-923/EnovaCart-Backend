@@ -12,6 +12,7 @@ type TransactionRepository interface {
 	FindOrders(uId uint) ([]domain.Order, error)
 	FindOrderByID(uId, id uint) (dto.SellerOrderDetails, error)
 	FindInitialPayment(uId uint) (*domain.Payment, error)
+	FindPaymentBySessionID(sessionID string) (*domain.Payment, error)
 	UpdatePayment(payment *domain.Payment) error
 }
 
@@ -35,6 +36,20 @@ func (t *transactionStorage) FindInitialPayment(uId uint) (*domain.Payment, erro
 	err := t.db.
 		Where("user_id = ? AND status = ?", uId, domain.PaymentStatusInitial).
 		Order("created_at DESC").
+		First(&payment).Error
+
+	if err != nil {
+		return nil, err
+	}
+
+	return &payment, nil
+}
+
+func (t *transactionStorage) FindPaymentBySessionID(sessionID string) (*domain.Payment, error) {
+	var payment domain.Payment
+
+	err := t.db.
+		Where("payment_id = ?", sessionID).
 		First(&payment).Error
 
 	if err != nil {
