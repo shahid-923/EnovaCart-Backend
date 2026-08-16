@@ -4,17 +4,21 @@ import (
 	"errors"
 	"log"
 	"os"
-
+   
 	"github.com/joho/godotenv"
 )
 
 type AppConfig struct {
 	ServerPort string
-	Dsn         string
-	AppSecret   string
+	Dsn        string
+	AppSecret  string
 
 	BrevoAPIKey string
 	EmailFrom   string
+
+	StripeSecret string
+	SuccessUrl   string
+	CancelUrl    string
 }
 
 func SetupEnvironment() (AppConfig, error) {
@@ -50,10 +54,13 @@ func SetupEnvironment() (AppConfig, error) {
 	}
 
 	return AppConfig{
-		ServerPort:  httpPort,
-		Dsn:         dsn,
-		AppSecret:   appSecret,
-		BrevoAPIKey: brevoAPIKey,
-		EmailFrom:   emailFrom,
+		ServerPort:   httpPort,
+		Dsn:          dsn,
+		AppSecret:    appSecret,
+		BrevoAPIKey:  brevoAPIKey,
+		EmailFrom:    emailFrom,
+		StripeSecret: os.Getenv("STRIPE_SECRET"),
+		SuccessUrl:   os.Getenv("SUCCESS_URL"),
+		CancelUrl:    os.Getenv("CANCEL_URL"),
 	}, nil
 }
