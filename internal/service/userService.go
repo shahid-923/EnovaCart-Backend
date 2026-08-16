@@ -390,9 +390,9 @@ func (s *UserService) CreateOrder(u domain.User) (string, error) {
 	// send email to the user with order details
 	// send email to the seller with order details
 
-	// remove the cart items after processing above
-	err = s.Repo.DeleteCartItems(u.ID)
-	log.Printf("Error deleting cart items: %v")
+	// NOTE: Cart items are NOT deleted here anymore.
+	// They will be deleted only after successful payment (via webhook)
+	// This keeps the cart intact in case user needs to modify order
 
 	// return orderRef no
 
