@@ -255,7 +255,7 @@ func (h *UserHandler) GetCart(ctx fiber.Ctx) error {
 		})
 	}
 
-	cart, err := h.svc.FindCart(user.ID)
+	cart, totalAmount, err := h.svc.FindCart(user.ID)
 	if err != nil {
 		return ctx.Status(http.StatusInternalServerError).JSON(fiber.Map{
 			"message": err.Error(),
@@ -263,8 +263,9 @@ func (h *UserHandler) GetCart(ctx fiber.Ctx) error {
 	}
 
 	return ctx.Status(http.StatusOK).JSON(fiber.Map{
-		"message": "cart fetched successfully",
-		"cart":    cart,
+		"message":      "cart fetched successfully",
+		"cart":         cart,
+		"total_amount": totalAmount,
 	})
 }
 
