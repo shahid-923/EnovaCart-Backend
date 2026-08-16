@@ -28,6 +28,8 @@ type UserRepository interface {
 	CreateOrder(o domain.Order) error
 	FindOrders(uId uint) ([]domain.Order, error)
 	FindOrderById(id uint, uId uint) (domain.Order, error)
+	FindOrderByRefNumber(refNumber string, uId uint) (domain.Order, error)
+	UpdateOrder(o domain.Order) error
 
 	// Profile
 	CreateProfile(e domain.Address) error
@@ -197,4 +199,35 @@ func (r *userRepository) FindOrderById(id uint, uId uint) (domain.Order, error) 
 		return domain.Order{}, errors.New("failed to fetch orders")
 	}
 	return order, nil
+}
+
+// FindOrderByRefNumber finds an order by its order reference number
+func (r *userRepository) FindOrderByRefNumber(refNumber string, uId uint) (domain.Order, error) {
+
+	var order domain.Order
+	err := r.db.Preload("Items").
+		Where("order_ref_number = ? AND user_id = ?", refNumber, uId).
+		First(&order).Error
+
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return domain.Order{}, errors.New("order not found")
+		}
+		log.Printf("error fetching order by ref number %v", err)
+		return domain.Order{}, errors.New("failed to fetch order")
+	}
+	return order, nil
+}
+
+// UpdateOrder updates an existing order
+func (r *userRepository) UpdateOrder(o domain.Order) error {
+	err := r.db.Model(&domain.Order{}).
+		Where("id = ?", o.ID).
+		Updates(o).Error
+
+	if err != nil {
+		log.Printf("error updating order %v", err)
+		return errors.New("failed to update order")
+	}
+	return nil
 }
