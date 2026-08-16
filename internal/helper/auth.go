@@ -163,7 +163,7 @@ func (a Auth) GetCurrentUser(ctx fiber.Ctx) (domain.User, error) {
 }
 
 func (a Auth) GenerateCode() (int, error) {
-	return RandomNumbers(6)
+	return GenerateOTP()
 }
 
 func (a Auth) AuthorizeSeller() fiber.Handler {
