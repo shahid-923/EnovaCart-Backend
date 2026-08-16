@@ -8,6 +8,7 @@ import (
 	"ecommerce-app/internal/api/rest/handlers"
 	"ecommerce-app/internal/domain"
 	"ecommerce-app/internal/helper"
+	"ecommerce-app/pkg/payment"
 
 	"github.com/gofiber/fiber/v3"
 	"github.com/gofiber/fiber/v3/middleware/cors"
@@ -36,6 +37,7 @@ func StartServer(config config.AppConfig) {
 		&domain.Cart{},
 		&domain.Order{},
 		&domain.OrderItem{},
+		&domain.Payment{},
 	)
 	if err != nil {
 		log.Fatalf("Database migration error: %v\n", err)
@@ -54,11 +56,14 @@ func StartServer(config config.AppConfig) {
 
 	auth := helper.SetupAuth(config.AppSecret)
 
+	paymentClient := payment.NewPaymentClient(config.StripeSecret, config.SuccessUrl, config.CancelUrl)
+
 	rh := &rest.RestHandler{
 		App:    app,
 		DB:     db,
 		Auth:   auth,
 		Config: config,
+		Pc:     paymentClient,
 	}
 
 	setupRoutes(rh)
@@ -74,5 +79,4 @@ func setupRoutes(rh *rest.RestHandler) {
 	handlers.SetupUserRoutes(rh)        // for userRoutes
 	handlers.SetupTransactionRoutes(rh) // for transactionRoutes
 	handlers.SetupCatalogueRoutes(rh)   // for catalogueRoutes
-
 }
