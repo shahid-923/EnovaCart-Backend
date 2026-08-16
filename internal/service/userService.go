@@ -319,37 +319,47 @@ func (s *UserService) CreateCart(input dto.CreateCartRequest, u domain.User) ([]
 	return s.Repo.FindCartItems(u.ID) // return the new total cart to save api calls
 }
 
-func (s *UserService) FindCart(id uint) ([]domain.Cart, error) {
+func (s *UserService) FindCart(id uint) ([]domain.Cart, float64, error) {
 
-	return s.Repo.FindCartItems(id)
-}
-
-func (s *UserService) CreateOrder(u domain.User) (int, error) {
-
-	// find the cart items for the user
-	cartItems, err := s.Repo.FindCartItems(u.ID)
+	cartItems, err := s.Repo.FindCartItems(id)
 
 	if err != nil {
-		return 0, errors.New("error on finding cart items")
+		return nil, 0, errors.New("error on finding cart items")
+	}
+
+	var totalAmount float64
+	for _, item := range cartItems {
+		totalAmount += float64(item.Qty) * float64(item.Price)
+	}
+
+	return cartItems, totalAmount, err
+}
+
+func (s *UserService) CreateOrder(u domain.User) (string, error) {
+
+	// find the cart items for the user
+	cartItems, amount, err := s.FindCart(u.ID)
+
+	if err != nil {
+		return "", errors.New("error on finding cart items")
 	}
 
 	if len(cartItems) == 0 {
-		return 0, errors.New("cart is empty cannot create the order")
+		return "", errors.New("cart is empty cannot create the order")
 	}
 
 	// find success payment reference status
 	paymentId := ""     // get from payment providers
 	transactionId := "" // expose to the user
 
-	orderRef, _ := helper.RandomNumbers(8)
+	orderRef, _ := helper.GenerateOrderID()
 
 	// create order with generated OrderNo
-	var amount float64
+
 	var orderItems []domain.OrderItem
 
 	for _, item := range cartItems {
 
-		amount += float64(item.Price) * float64(item.Qty)
 		orderItems = append(orderItems, domain.OrderItem{
 
 			ProductId: item.ProductId,
@@ -366,7 +376,7 @@ func (s *UserService) CreateOrder(u domain.User) (int, error) {
 		UserId:         u.ID,
 		PaymentId:      paymentId,
 		TransactionId:  transactionId,
-		OrderRefNumber: uint(orderRef),
+		OrderRefNumber: orderRef,
 		Amount:         amount,
 		Items:          orderItems,
 	}
@@ -374,7 +384,7 @@ func (s *UserService) CreateOrder(u domain.User) (int, error) {
 	err = s.Repo.CreateOrder(order)
 
 	if err != nil {
-		return 0, err
+		return " ", err
 	}
 
 	// send email to the user with order details
@@ -382,7 +392,7 @@ func (s *UserService) CreateOrder(u domain.User) (int, error) {
 
 	// remove the cart items after processing above
 	err = s.Repo.DeleteCartItems(u.ID)
-	log.Printf("Error deleting cart items %v")
+	log.Printf("Error deleting cart items: %v")
 
 	// return orderRef no
 

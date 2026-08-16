@@ -19,12 +19,11 @@ type CatalogueService struct {
 func (s CatalogueService) CreateCategory(input dto.CreateCategoryRequest) error {
 
 	err := s.Repo.CreateCategory(&domain.Category{
-	Name:         input.Name,
-	ParentId:     input.ParentId,
-	ImageUrl:     input.ImageUrl,
-	DisplayOrder: input.DisplayOrder,
-
-})
+		Name:         input.Name,
+		ParentId:     input.ParentId,
+		ImageUrl:     input.ImageUrl,
+		DisplayOrder: input.DisplayOrder,
+	})
 	return err
 }
 
@@ -131,8 +130,8 @@ func (s CatalogueService) EditProduct(id int, input dto.CreateProductRequest, us
 	if err != nil {
 		return nil, errors.New("product does not exist")
 	}
-    
-	if existingProduct.UserId != int(user.ID){
+
+	if existingProduct.UserId != int(user.ID) {
 		return nil, errors.New("you dont have manage rights of this product")
 	}
 	if input.Name != "" {
@@ -194,21 +193,21 @@ func (s CatalogueService) GetSellerProducts(id int) ([]*domain.Product, error) {
 	return products, nil
 }
 
-func (s CatalogueService) UpdateProductStock(e domain.Product)(*domain.Product, error){
+func (s CatalogueService) UpdateProductStock(e domain.Product) (*domain.Product, error) {
 
 	product, err := s.Repo.FindProductById(int(e.ID))
-	if err != nil{
+	if err != nil {
 		return nil, errors.New("product does not exist")
 	}
 
 	//verify product owner
-	if product.UserId != e.UserId{    // if provided userid and db's product id are same then
+	if product.UserId != e.UserId { // if provided userid and db's product id are same then
 		return nil, errors.New("you do not have permission to manage this product")
 	}
 	product.Stock = e.Stock
 
 	editProduct, err := s.Repo.EditProduct(product)
-	if err != nil{
+	if err != nil {
 		return nil, err
 	}
 	return editProduct, nil
