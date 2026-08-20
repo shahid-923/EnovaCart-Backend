@@ -29,6 +29,7 @@ func (s *TransactionService) GetActivePayment(uId uint) (*domain.Payment, error)
 	return s.Repo.FindInitialPayment(uId)
 }
 
+// StoreCreatedPayment stores payment info (legacy method for backward compatibility)
 func (s *TransactionService) StoreCreatedPayment(uId uint, ps *stripe.CheckoutSession, amount float64) error {
 	payment := domain.Payment{
 		UserId:     uId,
@@ -38,6 +39,38 @@ func (s *TransactionService) StoreCreatedPayment(uId uint, ps *stripe.CheckoutSe
 		PaymentId:  ps.ID,
 	}
 	return s.Repo.CreatePayment(&payment)
+}
+
+// StoreCreatedPaymentWithOrder links payment to an existing order and updates order with payment ID
+// This is the NEW method that properly links payment to order
+func (s *TransactionService) StoreCreatedPaymentWithOrder(uId uint, order *domain.Order, ps *stripe.CheckoutSession, amount float64, userRepo interface{}) error {
+	// Create payment record with order reference
+	payment := domain.Payment{
+		UserId:     uId,
+		Amount:     amount,
+		Status:     domain.PaymentStatusInitial,
+		PaymentUrl: ps.URL,
+		PaymentId:  ps.ID,
+		OrderId:    order.OrderRefNumber, // Link payment to order using orderRefNumber
+	}
+
+	// Store payment in DB
+	err := s.Repo.CreatePayment(&payment)
+	if err != nil {
+		return err
+	}
+
+	// Update order with Stripe payment ID
+	order.PaymentId = ps.ID
+	order.Status = "pending_payment" // Order waiting for payment completion
+
+	// Type assert to UserRepository to update order
+	ur, ok := userRepo.(interface{ UpdateOrder(domain.Order) error })
+	if !ok {
+		return errors.New("invalid user repository type")
+	}
+
+	return ur.UpdateOrder(*order)
 }
 
 func (s *TransactionService) CancelActivePayment(uId uint) error {

@@ -6,9 +6,14 @@ import (
 	"ecommerce-app/internal/repository"
 	"ecommerce-app/internal/service"
 	"ecommerce-app/pkg/payment"
+	"encoding/json"
+	"log"
 	"net/http"
+	"os"
 
 	"github.com/gofiber/fiber/v3"
+	"github.com/stripe/stripe-go/v86"
+	"github.com/stripe/stripe-go/v86/webhook"
 	"gorm.io/gorm"
 )
 
@@ -25,7 +30,6 @@ func initializeTransactionService(db *gorm.DB, auth helper.Auth, paymentClient p
 		paymentClient,
 	)
 }
-
 func SetupTransactionRoutes(as *rest.RestHandler) {
 
 	app := as.App
@@ -44,6 +48,9 @@ func SetupTransactionRoutes(as *rest.RestHandler) {
 		userSvc:       &useSvc,
 	}
 
+	// PUBLIC: Stripe calls this directly
+	app.Post("/payment/webhook", handler.StripeWebhook)
+
 	secRoute := app.Group("/", as.Auth.Authorize())
 	secRoute.Get("/payment", handler.MakePayment)
 	secRoute.Post("/payment/cancel", handler.CancelPayment)
@@ -56,7 +63,6 @@ func SetupTransactionRoutes(as *rest.RestHandler) {
 func (h *TransactionHandler) MakePayment(ctx fiber.Ctx) error {
 
 	// 1. Get the currently authenticated user
-
 	user, err := h.svc.Auth.GetCurrentUser(ctx)
 	if err != nil {
 		return ctx.Status(http.StatusUnauthorized).JSON(fiber.Map{
@@ -65,71 +71,54 @@ func (h *TransactionHandler) MakePayment(ctx fiber.Ctx) error {
 		})
 	}
 
-	
-	// 2. Check whether the user already has an initial payment
-	
-	activePayment, err := h.svc.GetActivePayment(user.ID)
+	// 2. Get the latest order for this user (should be created by POST /order)
+	orders, err := h.userSvc.GetOrders(user)
+	if err != nil || len(orders) == 0 {
+		return ctx.Status(http.StatusBadRequest).JSON(fiber.Map{
+			"message": "no order found - please create an order first",
+			"error":   "use POST /order endpoint before making payment",
+		})
+	}
 
-	if err == nil && activePayment != nil && activePayment.ID > 0 {
-	
-		// 3. The payment exists in our DB.
-		//    Now verify its actual status with Stripe.
+	// Get the most recent order
+	order := orders[0]
+	for _, o := range orders {
+		if o.CreatedAt.After(order.CreatedAt) {
+			order = o
+		}
+	}
 
-		stripeSession, stripeErr := h.paymentClient.GetPaymentStatus(
-			activePayment.PaymentId,
-		)
+	// 3. Check if this order already has an active payment
+	if order.PaymentId != "" {
+		// Order already has a payment ID, verify it with Stripe
+		stripeSession, stripeErr := h.paymentClient.GetPaymentStatus(order.PaymentId)
 
-	
-		// 4. If Stripe session is still open, reuse it.
-		//    This prevents creating multiple payment sessions.
-
-		if stripeErr == nil &&
-			stripeSession != nil &&
-			stripeSession.Status == "open" {
-
+		if stripeErr == nil && stripeSession != nil && stripeSession.Status == "open" {
+			// Stripe session is still valid, reuse it
 			return ctx.Status(http.StatusOK).JSON(fiber.Map{
-				"message":     "payment session already exists",
-				"payment_url": activePayment.PaymentUrl,
+				"message":     "payment session already exists for this order",
+				"order_id":    order.OrderRefNumber,
+				"payment_url": stripeSession.URL,
+				"session_id":  stripeSession.ID,
+				"status":      "pending_payment",
 			})
 		}
-
-		// 5. If Stripe session is not open anymore, we don't
-		//    reuse the old URL.
-		//    Continue below and create a new payment session.
-	
+		// If Stripe session is not open, continue to create a new one
 	}
 
-	// 6. Get the user's cart and calculate the total amount
-	_, amount, err := h.userSvc.FindCart(user.ID)
-	if err != nil {
-		return ctx.Status(http.StatusInternalServerError).JSON(fiber.Map{
-			"message": "failed to fetch cart",
-			"error":   err.Error(),
-		})
-	}
-
-	// 7. Do not create a Stripe payment for an empty cart
+	// 4. Calculate total amount from order items
+	amount := order.Amount
 	if amount <= 0 {
 		return ctx.Status(http.StatusBadRequest).JSON(fiber.Map{
-			"message": "cart is empty",
+			"message": "order amount is invalid",
 		})
 	}
 
-	// 8. Generate a unique order reference.
-	//    Your GenerateOrderID() returns string.
-	orderID, err := helper.GenerateOrderID()
-	if err != nil {
-		return ctx.Status(http.StatusInternalServerError).JSON(fiber.Map{
-			"message": "failed to generate order id",
-			"error":   err.Error(),
-		})
-	}
-
-	// 9. Create a new Stripe Checkout Session
+	// 5. Create a new Stripe Checkout Session
 	sessionResult, err := h.paymentClient.CreatePayment(
 		amount,
 		user.ID,
-		orderID,
+		order.OrderRefNumber, // Use the order reference number
 	)
 
 	if err != nil {
@@ -139,11 +128,14 @@ func (h *TransactionHandler) MakePayment(ctx fiber.Ctx) error {
 		})
 	}
 
-	// 10. Save the newly created payment session in DB
-	err = h.svc.StoreCreatedPayment(
+	// 6. Save the payment and link it to the order
+	// This updates both Payment table and Order.PaymentId
+	err = h.svc.StoreCreatedPaymentWithOrder(
 		user.ID,
+		&order,
 		sessionResult,
 		amount,
+		h.userSvc.Repo, // Pass repository to update order
 	)
 
 	if err != nil {
@@ -153,11 +145,67 @@ func (h *TransactionHandler) MakePayment(ctx fiber.Ctx) error {
 		})
 	}
 
-	// 11. Return the new Stripe Checkout URL
+	// 7. Return comprehensive payment response
 	return ctx.Status(http.StatusOK).JSON(fiber.Map{
 		"message":     "payment session created successfully",
+		"order_id":    order.OrderRefNumber,
+		"session_id":  sessionResult.ID,
 		"payment_url": sessionResult.URL,
+		"amount":      amount,
+		"status":      "pending_payment",
+		"instruction": "redirect user to payment_url to complete payment",
 	})
+}
+
+func (h *TransactionHandler) StripeWebhook(ctx fiber.Ctx) error {
+
+	payload := ctx.Body()
+	signature := ctx.Get("Stripe-Signature")
+
+	event, err := webhook.ConstructEvent(
+		payload,
+		signature,
+		os.Getenv("STRIPE_WEBHOOK_SECRET"),
+	)
+
+	if err != nil {
+		log.Printf("Stripe webhook signature verification failed: %v", err)
+
+		return ctx.Status(http.StatusBadRequest).JSON(fiber.Map{
+			"message": "invalid stripe webhook signature",
+		})
+	}
+
+	switch event.Type {
+
+	case stripe.EventTypeCheckoutSessionCompleted:
+
+		var session stripe.CheckoutSession
+
+		err := json.Unmarshal(event.Data.Raw, &session)
+		if err != nil {
+			log.Printf("Failed to parse checkout session: %v", err)
+
+			return ctx.Status(http.StatusBadRequest).JSON(fiber.Map{
+				"message": "invalid checkout session",
+			})
+		}
+
+		orderID := session.Metadata["order_id"]
+		userID := session.Metadata["user_id"]
+
+		log.Printf(
+			"Stripe payment completed - SessionID: %s, OrderID: %s, UserID: %s",
+			session.ID,
+			orderID,
+			userID,
+		)
+
+	default:
+		log.Printf("Unhandled Stripe event: %s", event.Type)
+	}
+
+	return ctx.SendStatus(http.StatusOK)
 }
 
 func (h *TransactionHandler) CancelPayment(ctx fiber.Ctx) error {

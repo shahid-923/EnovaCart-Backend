@@ -79,4 +79,5 @@ func setupRoutes(rh *rest.RestHandler) {
 	handlers.SetupUserRoutes(rh)        // for userRoutes
 	handlers.SetupTransactionRoutes(rh) // for transactionRoutes
 	handlers.SetupCatalogueRoutes(rh)   // for catalogueRoutes
+	handlers.SetupWebhookRoutes(rh)     // for Stripe webhooks
 }
