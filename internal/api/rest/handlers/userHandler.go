@@ -112,7 +112,7 @@ func (h *UserHandler) CreateProfile(ctx fiber.Ctx) error {
 		})
 	}
 
-	log.Printf("User %v, user")
+	log.Printf("User %v, user", user)
 
 	// create profile
 	err = h.svc.CreateProfile(user.ID, req)
