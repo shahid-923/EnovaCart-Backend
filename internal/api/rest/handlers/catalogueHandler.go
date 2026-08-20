@@ -151,22 +151,22 @@ func (h *CatalogueHandler) CreateProducts(ctx fiber.Ctx) error {
 }
 
 func (h *CatalogueHandler) GetProducts(ctx fiber.Ctx) error {
-	
+
 	products, err := h.svc.GetProducts()
-	if err != nil{
+	if err != nil {
 		return rest.ErrorMessage(ctx, 404, err)
 	}
-    
+
 	return rest.SuccessResponse(ctx, "products fetched successfully", products)
 }
 
 func (h *CatalogueHandler) GetProduct(ctx fiber.Ctx) error {
-	
+
 	id, _ := strconv.Atoi(ctx.Params("id"))
 	product, err := h.svc.GetProductById(id)
 
-	if err != nil{
-	return rest.ErrorMessage(ctx, 404, err)
+	if err != nil {
+		return rest.ErrorMessage(ctx, 404, err)
 	}
 
 	return rest.SuccessResponse(ctx, "product fetched successfully", product)
@@ -219,14 +219,14 @@ func (h *CatalogueHandler) UpdateStock(ctx fiber.Ctx) error {
 	}
 
 	product := domain.Product{
-		ID: uint(id),
-		Stock: uint(req.Stock),
+		ID:     uint(id),
+		Stock:  uint(req.Stock),
 		UserId: int(user.ID),
 	}
-	
+
 	updatedProduct, err := h.svc.UpdateProductStock(product)
 	if err != nil {
-	return rest.InternalError(ctx, err)
+		return rest.InternalError(ctx, err)
 	}
 
 	return rest.SuccessResponse(ctx, "stock updated successfully", updatedProduct)

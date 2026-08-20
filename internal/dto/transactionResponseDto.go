@@ -1,6 +1,6 @@
 package dto
 
-type SellerOrderDetails struct {      // info required by seller to ship address
+type SellerOrderDetails struct { // info required by seller to ship address
 	OrderRefNumber  int    `json:"order_ref_number"`
 	OrderStatus     int    `json:"order_status"`
 	CreatedAt       string `json:"created_at"`
